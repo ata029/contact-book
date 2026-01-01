@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>嘉義縣龍港國小電子聯絡簿</title>
+    <!-- Favicon (使用 emoji 作為簡易圖示) -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    <!-- Bootstrap 5 CSS (更換為溫馨的圓角風格) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <style>
+        /* --- 溫馨教育風格配色 --- */
+        :root {
+            --primary-color: #557C55;
+            /* 墨綠色 (黑板色) */
+            --primary-light: #A6CF98;
+            /* 淺綠色 */
+            --accent-color: #F29727;
+            /* 溫暖橘 (粉筆/重點) */
+            --bg-color: #FA7070;
+            /* 柔和背景 */
+            --card-bg: #FFFBF5;
+            /* 米色卡片背景 (護眼) */
+            --text-color: #4A4A4A;
+            /* 深灰文字 (不刺眼) */
+        }
+
+        body {
+            background-color: #F3F4F6;
+            font-family: "Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Heiti TC", "Noto Sans TC", sans-serif;
+            color: var(--text-color);
+            background-image: radial-gradient(#E5E7EB 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .header-bar {
+            background-color: #ffffff;
+            border-bottom: 5px solid var(--primary-color);
+            padding: 1rem 0;
+            box-shadow: 0 4px 12px rgba(85, 124, 85, 0.15);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .btn-warm {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 50px;
+            padding: 0.5rem 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .btn-warm:hover {
+            background-color: #446344;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-accent {
+            background-color: var(--accent-color);
+            color: white;
+            border-radius: 50px;
+            border: none;
+        }
+
+        .btn-accent:hover {
+            background-color: #D68218;
+            color: white;
+        }
+
+        .card-custom {
+            border: none;
+            border-radius: 20px;
+            background-color: var(--card-bg);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+            margin-bottom: 25px;
+            overflow: hidden;
+            border: 1px solid #EFEFEF;
+        }
+
+        .grade-btn {
+            height: 140px;
+            font-size: 2.5rem;
+            font-weight: 900;
+            border-radius: 20px;
+            transition: all 0.3s;
+            background-color: white;
+            border: 2px solid #E0E0E0;
+            color: var(--primary-color);
+        }
+
+        .grade-btn:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary-color);
+            background-color: #F0FDF4;
+            box-shadow: 0 10px 20px rgba(85, 124, 85, 0.15);
+        }
+
+        .clock-display {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: var(--primary-color);
+            letter-spacing: -2px;
+        }
+
+        .status-badge {
+            font-size: 0.95rem;
+            padding: 0.6em 1.2em;
+            border-radius: 50rem;
+            letter-spacing: 1px;
+        }
+
+        .content-pre {
+            white-space: pre-wrap;
+            font-family: inherit;
+            line-height: 1.8;
+            color: #2D3748;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .error-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+        }
+
+        .error-box {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            max-width: 600px;
+            width: 90%;
+            border-top: 10px solid #DC3545;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">
+        <!-- Loading 遮罩 -->
+        <div v-if="loading" class="loading-overlay">
+            <div class="spinner-grow text-success mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+            <h5 class="text-muted fw-bold">資料同步中...</h5>
+        </div>
+
+        <!-- 權限錯誤提示 -->
+        <div v-if="permissionError" class="error-overlay">
+            <div class="error-box">
+                <h3 class="text-danger fw-bold mb-3"><i class="bi bi-shield-lock-fill"></i> 資料庫連線被拒絕</h3>
+                <p class="fs-5 text-secondary">請檢查 Firebase 後台設定，確保程式有權限讀寫資料。</p>
+                <div class="alert alert-light border">
+                    <strong>🔧 解決步驟：</strong>
+                    <ol class="mb-0 mt-2 ps-3">
+                        <li class="mb-2">進入 <strong>Firebase Console > Firestore Database > Rules</strong>，將規則改為：<br>
+                            <code class="text-primary">allow read, write: if true;</code>
+                        </li>
+                        <li>進入 <strong>Authentication > Sign-in method</strong>，啟用 <strong>匿名 (Anonymous)</strong> 登入。
+                        </li>
+                    </ol>
+                </div>
+                <button class="btn btn-danger w-100 py-2 rounded-pill fw-bold" @click="location.reload()">
+                    <i class="bi bi-arrow-clockwise me-1"></i> 設定完成，重新載入
+                </button>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <header class="header-bar">
+            <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center">
+                <div class="d-flex align-items-center mb-3 mb-md-0">
+                    <div class="bg-success bg-opacity-10 p-2 rounded-3 me-3">
+                        <i class="bi bi-mortarboard-fill text-success fs-1"></i>
+                    </div>
+                    <div>
+                        <h1 class="h4 mb-0 fw-bold" style="color: #2c3e50;">嘉義縣龍港國小</h1>
+                        <small class="text-muted fw-bold ls-1">電子聯絡簿平台</small>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 bg-light p-1 rounded-pill border">
+                    <button type="button" class="btn rounded-pill px-4 fw-bold"
+                        :class="appMode === 'receiver' ? 'btn-white shadow-sm text-success' : 'text-muted'"
+                        @click="setMode('receiver')">
+                        <i class="bi bi-backpack2-fill me-1"></i> 學生端
+                    </button>
+                    <button type="button" class="btn rounded-pill px-4 fw-bold"
+                        :class="appMode === 'sender' ? 'btn-white shadow-sm text-warning' : 'text-muted'"
+                        @click="setMode('sender')">
+                        <i class="bi bi-person-video3 me-1"></i> 老師端
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="container py-5">
+
+            <!-- ================= 發送端 (Sender) ================= -->
+            <div v-if="appMode === 'sender'" class="fade-in">
+
+                <!-- 步驟 1: 選擇年級 -->
+                <div v-if="senderStep === 'select-grade'" class="text-center">
+                    <h2 class="mb-2 fw-bold" style="color: var(--primary-color);">請選擇班級</h2>
+                    <p class="text-muted mb-5">點擊對應年級進入管理後台</p>
+                    <div class="row g-4 justify-content-center">
+                        <div class="col-6 col-md-4 col-lg-3" v-for="g in 6" :key="g">
+                            <button
+                                class="btn w-100 grade-btn d-flex flex-column align-items-center justify-content-center shadow-sm"
+                                @click="selectGrade(g)">
+                                <span class="display-3">{{ g }}</span>
+                                <span class="fs-6 fw-bold opacity-50">年級</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步驟 2: 輸入密碼 -->
+                <div v-if="senderStep === 'input-password'" class="row justify-content-center">
+                    <div class="col-md-6 col-lg-5">
+                        <div class="card card-custom p-5 text-center">
+                            <div class="mb-4">
+                                <span class="badge bg-warning text-dark fs-6 rounded-pill px-3 py-2">
+                                    <i class="bi bi-lock-fill me-1"></i> {{ currentGrade }} 年級教師後台
+                                </span>
+                            </div>
+                            <h3 class="mb-2 fw-bold text-dark">權限驗證</h3>
+                            <p class="text-muted mb-4">請輸入教師管理密碼以繼續</p>
+                            <form @submit.prevent="handleLogin">
+                                <div class="mb-4">
+                                    <input type="password" v-model="passwordInput"
+                                        class="form-control form-control-lg text-center rounded-pill bg-light border-0 py-3"
+                                        placeholder="輸入密碼" autofocus>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex">
+                                    <button type="button" class="btn btn-light rounded-pill flex-fill py-2"
+                                        @click="senderStep = 'select-grade'">返回</button>
+                                    <button type="submit"
+                                        class="btn btn-accent rounded-pill flex-fill fw-bold py-2 shadow-sm">進入管理</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 步驟 3: 管理介面 -->
+                <div v-if="senderStep === 'verified'">
+                    <!-- 發布區塊 -->
+                    <div class="card card-custom mb-5 border-0 shadow-lg">
+                        <div
+                            class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-success rounded-pill mb-2">發布模式</span>
+                                <h4 class="mb-0 text-dark fw-bold">發布 {{ currentGrade }} 年級聯絡事項</h4>
+                            </div>
+                            <button class="btn btn-outline-danger btn-sm rounded-pill px-3" @click="handleLogout">
+                                <i class="bi bi-box-arrow-right me-1"></i> 登出
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row mb-4 g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-success small">開始開放時間</label>
+                                    <input type="datetime-local" v-model="startTime"
+                                        class="form-control form-control-lg bg-light border-0">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-secondary small">結束關閉時間</label>
+                                    <input type="datetime-local" v-model="endTime"
+                                        class="form-control form-control-lg bg-light border-0">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <textarea v-model="inputText" class="form-control bg-light border-0 p-3 fs-5" rows="6"
+                                    placeholder="請在此輸入聯絡事項內容..."></textarea>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 border-2 fw-bold">
+                                    <i class="bi bi-paperclip me-1"></i> 讀取文字檔
+                                    <input type="file" @change="handleFileSelect" hidden>
+                                </label>
+                                <button class="btn btn-warm shadow-lg px-5 py-2 fs-5 fw-bold" @click="handleUpload"
+                                    :disabled="!inputText.trim()">
+                                    <i class="bi bi-send-fill me-2"></i> 發布事項
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 列表區塊 -->
+                    <h5 class="text-muted fw-bold mb-3 ps-2 border-start border-4 border-warning ps-3">已發布列表 ({{
+                        documents.length }})</h5>
+                    <div v-for="doc in documents" :key="doc.id"
+                        class="card card-custom p-4 mb-3 border border-light shadow-sm">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="w-100">
+                                <div class="mb-3 d-flex align-items-center">
+                                    <span v-html="getStatusBadge(doc)"></span>
+                                    <small class="text-muted ms-auto bg-light px-2 py-1 rounded">發布於: {{
+                                        formatTime(doc.createdAt) }}</small>
+                                </div>
+                                <div class="bg-light p-4 rounded-4 mb-3 border-start border-4 border-success">
+                                    <pre class="content-pre mb-0 fs-5">{{ doc.content }}</pre>
+                                </div>
+                                <div class="small text-secondary d-flex gap-3">
+                                    <span><i class="bi bi-play-circle-fill text-success"></i> 開始: {{
+                                        formatTime(doc.startTime) }}</span>
+                                    <span><i class="bi bi-stop-circle-fill text-danger"></i> 結束: {{
+                                        formatTime(doc.endTime) }}</span>
+                                </div>
+                            </div>
+                            <div class="ms-3">
+                                <button class="btn btn-light text-danger rounded-circle p-2 shadow-sm hover-shadow"
+                                    @click="handleDelete(doc.id)" title="刪除此事項">
+                                    <i class="bi bi-trash-fill fs-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= 接收端 (Receiver) ================= -->
+            <div v-if="appMode === 'receiver'" class="fade-in">
+
+                <!-- 資訊列 -->
+                <div class="card card-custom mb-5 p-4 border-0 shadow-lg">
+                    <div class="row align-items-center">
+                        <div class="col-md-7 mb-3 mb-md-0">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success rounded-pill fs-6 px-3 py-2 me-2">學生端</span>
+                                <h2 class="text-dark fw-bold mb-0">
+                                    {{ currentGrade }} 年級聯絡簿
+                                </h2>
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <div class="dropdown">
+                                    <button class="btn btn-light border dropdown-toggle btn-sm rounded-pill px-3"
+                                        type="button" data-bs-toggle="dropdown">
+                                        切換年級
+                                    </button>
+                                    <ul class="dropdown-menu shadow border-0 rounded-4">
+                                        <li v-for="g in 6" :key="g"><a class="dropdown-item py-2" href="#"
+                                                @click.prevent="changeReceiverGrade(g)">{{ g }} 年級</a></li>
+                                    </ul>
+                                </div>
+
+                                <button class="btn btn-light border btn-sm rounded-pill px-3 text-warning fw-bold"
+                                    @click="copyUrl">
+                                    <i class="bi bi-link-45deg"></i> 複製連結
+                                </button>
+
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary rounded-start-pill px-3"
+                                        @click="adjustFontSize(-4)">A-</button>
+                                    <button class="btn btn-outline-secondary disabled text-dark fw-bold">{{ fontSize
+                                        }}px</button>
+                                    <button class="btn btn-outline-secondary rounded-end-pill px-3"
+                                        @click="adjustFontSize(4)">A+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="col-md-5 text-md-end text-center bg-light rounded-4 p-3 border border-white shadow-inner">
+                            <small class="text-muted fw-bold ls-2">CURRENT TIME</small>
+                            <div class="display-3 clock-display my-1">{{ currentTimeStr }}</div>
+                            <div class="text-secondary fw-bold">{{ currentDateStr }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 內容列表 -->
+                <div v-if="documents.length === 0"
+                    class="text-center py-5 text-muted border-2 border-dashed rounded-4 bg-white">
+                    <i class="bi bi-journal-x fs-1 d-block mb-3 text-secondary opacity-50"></i>
+                    <h4>目前沒有事項</h4>
+                    <p>老師尚未發布內容，請稍後再回來查看</p>
+                </div>
+
+                <div v-else class="vstack gap-4">
+                    <div v-for="doc in documents" :key="doc.id">
+
+                        <!-- 開放中 (Active) -->
+                        <div v-if="getStatus(doc) === 'active'"
+                            class="card card-custom border-0 shadow-lg position-relative overflow-hidden">
+                            <div class="position-absolute top-0 start-0 h-100 bg-success" style="width: 6px;"></div>
+                            <div
+                                class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center ps-4">
+                                <h5 class="mb-0 text-success fw-bold"><i class="bi bi-megaphone-fill me-2"></i>今日事項</h5>
+                                <span
+                                    class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3">
+                                    <i class="bi bi-clock"></i> 直到: {{ formatTime(doc.endTime) }}
+                                </span>
+                            </div>
+                            <div class="card-body p-5">
+                                <pre class="content-pre" :style="{ fontSize: fontSize + 'px' }">{{ doc.content }}</pre>
+                                <hr class="text-muted opacity-25 my-4">
+                                <div class="text-end">
+                                    <button class="btn btn-light text-secondary rounded-pill px-4 fw-bold hover-shadow"
+                                        @click="copyText(doc.content)">
+                                        <i class="bi bi-clipboard me-1"></i> 複製內容
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 未開放 (Upcoming) -->
+                        <div v-if="getStatus(doc) === 'upcoming'"
+                            class="card card-custom bg-white border text-center p-5 position-relative overflow-hidden shadow-sm">
+                            <div class="position-relative" style="z-index: 2;">
+                                <div class="mb-4">
+                                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle d-inline-block">
+                                        <i class="bi bi-lock-fill text-warning display-3"></i>
+                                    </div>
+                                </div>
+                                <h3 class="text-secondary fw-bold mb-3">事項尚未開放</h3>
+                                <div class="d-inline-block bg-light px-4 py-2 rounded-3 border">
+                                    <p class="fs-5 mb-0 text-muted">
+                                        開放時間：<span class="fw-bold text-dark">{{ formatTime(doc.startTime) }}</span>
+                                    </p>
+                                </div>
+                                <div class="mt-4">
+                                    <span
+                                        class="badge bg-warning text-dark fs-6 rounded-pill px-3 py-2 shadow-sm animate-pulse">
+                                        <i class="bi bi-hourglass-split me-1"></i> 倒數計時中
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- 背景裝飾 -->
+                            <div
+                                style="position:absolute; top:-20px; left:-20px; width:100px; height:100px; background:#fff3cd; border-radius:50%; opacity:0.5;">
+                            </div>
+                        </div>
+
+                        <!-- 已過期 (Expired) -->
+                        <div v-if="getStatus(doc) === 'expired'"
+                            class="card card-custom bg-light text-center p-4 opacity-75 border-0">
+                            <h4 class="text-muted"><i class="bi bi-eye-slash-fill me-2"></i>此事項已結束顯示</h4>
+                            <small class="text-muted">結束時間: {{ formatTime(doc.endTime) }}</small>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <footer class="text-center py-4 text-muted small">
+            &copy; 嘉義縣龍港國小 | 電子聯絡簿系統
+        </footer>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { createApp, ref, onMounted, onUnmounted, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // ---------------------------------------------------------
+        // Firebase Config
+        // ⚠️ 安全性提醒：請至 Firebase Console > Authentication > Settings
+        //    的「授權網域」中，只保留您實際使用的網域 (如 github.io)
+        // ---------------------------------------------------------
+        const firebaseConfig = {
+            apiKey: "AIzaSyDrSVuDzfPFNJlCdcaBtKEay41avOTPEEU",
+            authDomain: "longgang-contact-book.firebaseapp.com",
+            projectId: "longgang-contact-book",
+            storageBucket: "longgang-contact-book.firebasestorage.app",
+            messagingSenderId: "791118094014",
+            appId: "1:791118094014:web:f57ace533a3e58f86c88ef"
+        };
+
+        // ---------------------------------------------------------
+        // 密碼雜湊值 (SHA-256)
+        // 原始密碼: lg000000es -> 此為雜湊後的值，無法反推原始密碼
+        // 如需更換密碼，請使用線上 SHA-256 工具產生新的雜湊值
+        // ---------------------------------------------------------
+        const PASSWORD_HASH = '02c1642d54de232b9926af7dfb7ef35f606c01d16e713f29f4858a0f3761a226';
+
+        // SHA-256 雜湊函式
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const APP_ID = 'longgang_school_v1';
+
+        createApp({
+            setup() {
+                // 狀態變數
+                const user = ref(null);
+                const documents = ref([]);
+                const loading = ref(true);
+                const permissionError = ref(false);
+                const currentTime = ref(new Date());
+                const appMode = ref('receiver');
+                const currentGrade = ref(1);
+
+                // 發送端變數
+                const senderStep = ref('select-grade');
+                const passwordInput = ref('');
+                const inputText = ref('');
+                const startTime = ref('');
+                const endTime = ref('');
+
+                // 顯示設定 (預設 48px)
+                const fontSize = ref(48);
+
+                // 輔助函式: 時間格式化
+                const formatDateTimeLocal = (date) => {
+                    const d = new Date(date);
+                    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                    return d.toISOString().slice(0, 16);
+                };
+
+                startTime.value = formatDateTimeLocal(new Date());
+                endTime.value = formatDateTimeLocal(new Date(Date.now() + 3600000));
+
+                const currentTimeStr = computed(() => currentTime.value.toLocaleTimeString('zh-TW', { hour12: false }));
+                const currentDateStr = computed(() => currentTime.value.toLocaleDateString('zh-TW'));
+
+                // 1. 初始化
+                onMounted(() => {
+                    const handleHashChange = () => {
+                        const hash = window.location.hash;
+                        const match = hash.match(/grade=(\d+)/);
+                        if (match && match[1]) {
+                            const g = parseInt(match[1]);
+                            if (g >= 1 && g <= 6) {
+                                currentGrade.value = g;
+                                appMode.value = 'receiver';
+                            }
+                        }
+                    };
+                    handleHashChange();
+                    window.addEventListener('hashchange', handleHashChange);
+
+                    signInAnonymously(auth).catch((error) => {
+                        console.error("Auth Failed", error);
+                        permissionError.value = true;
+                        loading.value = false;
+                    });
+
+                    onAuthStateChanged(auth, (u) => {
+                        user.value = u;
+                        if (u) startListening();
+                    });
+
+                    setInterval(() => {
+                        currentTime.value = new Date();
+                    }, 1000);
+                });
+
+                // 2. 監聽 Firestore
+                let unsubscribe = null;
+                const startListening = () => {
+                    if (unsubscribe) unsubscribe();
+
+                    const fullColRef = collection(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`);
+
+                    unsubscribe = onSnapshot(fullColRef, (snapshot) => {
+                        loading.value = false;
+                        permissionError.value = false;
+
+                        const docs = snapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return {
+                                id: doc.id, // 確保這裡抓到正確的 ID
+                                ...data,
+                                createdAt: data.createdAt?.toDate() || new Date(),
+                                startTime: data.startTime?.toDate() || new Date(),
+                                endTime: data.endTime?.toDate() || new Date(),
+                            };
+                        });
+                        docs.sort((a, b) => b.createdAt - a.createdAt);
+                        documents.value = docs;
+                    }, (error) => {
+                        console.error("Firestore Listen Error:", error);
+                        loading.value = false;
+                        if (error.code === 'permission-denied') {
+                            permissionError.value = true;
+                        }
+                    });
+                };
+
+                const changeReceiverGrade = (g) => {
+                    currentGrade.value = g;
+                    window.location.hash = `grade=${g}`;
+                    startListening();
+                };
+
+                const selectGrade = (g) => {
+                    currentGrade.value = g;
+                    senderStep.value = 'input-password';
+                    passwordInput.value = '';
+                };
+
+                const handleLogin = async () => {
+                    const inputHash = await sha256(passwordInput.value);
+                    if (inputHash === PASSWORD_HASH) {
+                        senderStep.value = 'verified';
+                        startListening();
+                    } else {
+                        alert('密碼錯誤');
+                        passwordInput.value = '';
+                    }
+                };
+
+                const handleLogout = () => {
+                    senderStep.value = 'select-grade';
+                };
+
+                const handleUpload = async () => {
+                    if (!user.value) return;
+                    try {
+                        loading.value = true;
+                        const start = new Date(startTime.value);
+                        const end = new Date(endTime.value);
+
+                        if (end <= start) {
+                            alert("結束時間不能早於開始時間");
+                            loading.value = false;
+                            return;
+                        }
+
+                        const fullColRef = collection(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`);
+
+                        await addDoc(fullColRef, {
+                            content: inputText.value,
+                            authorId: user.value.uid,
+                            createdAt: serverTimestamp(),
+                            startTime: Timestamp.fromDate(start),
+                            endTime: Timestamp.fromDate(end),
+                            grade: currentGrade.value,
+                            type: 'text'
+                        });
+
+                        inputText.value = '';
+                        alert('發布成功！');
+                    } catch (e) {
+                        console.error(e);
+                        if (e.code === 'permission-denied') {
+                            permissionError.value = true;
+                        } else {
+                            alert('發布失敗: ' + e.message);
+                        }
+                    } finally {
+                        loading.value = false;
+                    }
+                };
+
+                // 修正後的刪除功能
+                const handleDelete = async (id) => {
+                    if (!id) {
+                        alert("錯誤：無法識別文件 ID");
+                        return;
+                    }
+
+                    if (!confirm('⚠️ 確定要刪除這則聯絡事項嗎？\n\n刪除後無法復原。')) return;
+
+                    try {
+                        // 確保路徑與新增時完全一致
+                        const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`, id);
+                        await deleteDoc(docRef);
+                        alert('刪除成功！');
+                    } catch (e) {
+                        console.error("Delete failed:", e);
+                        if (e.code === 'permission-denied') {
+                            permissionError.value = true;
+                        } else {
+                            alert('刪除失敗：' + e.message);
+                        }
+                    }
+                };
+
+                const handleFileSelect = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => inputText.value = ev.target.result;
+                    reader.readAsText(file);
+                };
+
+                const getStatus = (doc) => {
+                    const now = currentTime.value.getTime();
+                    const start = doc.startTime.getTime();
+                    const end = doc.endTime.getTime();
+                    if (now < start) return 'upcoming';
+                    if (now > end) return 'expired';
+                    return 'active';
+                };
+
+                const getStatusBadge = (doc) => {
+                    const s = getStatus(doc);
+                    if (s === 'upcoming') return `<span class="badge bg-warning text-dark status-badge rounded-pill"><i class="bi bi-lock-fill"></i> 未開放</span>`;
+                    if (s === 'active') return `<span class="badge bg-success status-badge rounded-pill"><i class="bi bi-book"></i> 開放中</span>`;
+                    return `<span class="badge bg-secondary status-badge rounded-pill">已結束</span>`;
+                };
+
+                const formatTime = (date) => {
+                    if (!date) return '';
+                    return date.toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+                };
+
+                // 複製連結功能 (加入本機偵測)
+                const copyUrl = async () => {
+                    const protocol = window.location.protocol;
+                    const url = window.location.href.split('#')[0] + '#grade=' + currentGrade.value;
+
+                    let warningMsg = "";
+                    if (protocol === 'file:') {
+                        warningMsg = "\n\n⚠️ 注意：您目前是直接開啟檔案 (file://)。\n這個網址只有您的電腦打得開。\n\n若要分享給家長，請將此 html 檔案上傳到網路空間。";
+                    } else if (protocol === 'blob:') {
+                        warningMsg = "\n\n⚠️ 注意：這是預覽連結，無法對外分享。";
+                    }
+
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        alert('網址已複製！' + warningMsg);
+                    } catch (e) {
+                        prompt('請手動複製網址:' + warningMsg, url);
+                    }
+                };
+
+                const copyText = async (text) => {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        alert('內容已複製');
+                    } catch (e) {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        alert('內容已複製');
+                    }
+                };
+
+                const setMode = (mode) => {
+                    appMode.value = mode;
+                    if (mode === 'sender') senderStep.value = 'select-grade';
+                };
+
+                const adjustFontSize = (delta) => {
+                    fontSize.value = Math.max(16, Math.min(96, fontSize.value + delta));
+                };
+
+                return {
+                    user, documents, loading, permissionError, currentTimeStr, currentDateStr,
+                    appMode, currentGrade, senderStep, passwordInput, inputText, startTime, endTime, fontSize,
+                    changeReceiverGrade, selectGrade, handleLogin, handleLogout, handleUpload, handleDelete, handleFileSelect,
+                    getStatus, getStatusBadge, formatTime, copyUrl, copyText, setMode, adjustFontSize
+                };
+            }
+        }).mount('#app');
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>
