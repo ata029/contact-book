@@ -86,7 +86,7 @@
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
             transition: transform 0.2s;
             margin-bottom: 25px;
-            overflow: hidden;
+            /* 移除 overflow: hidden 以免遮擋下拉選單 */
             border: 1px solid #EFEFEF;
         }
 
@@ -355,8 +355,8 @@
             <!-- ================= 接收端 (Receiver) ================= -->
             <div v-if="appMode === 'receiver'" class="fade-in">
 
-                <!-- 資訊列 -->
-                <div class="card card-custom mb-5 p-4 border-0 shadow-lg">
+                <!-- 資訊列 (提升 z-index 確保下拉選單不被遮擋) -->
+                <div class="card card-custom mb-5 p-4 border-0 shadow-lg" style="position: relative; z-index: 100;">
                     <div class="row align-items-center">
                         <div class="col-md-7 mb-3 mb-md-0">
                             <div class="d-flex align-items-center mb-2">
