@@ -281,8 +281,12 @@
                         <div
                             class="card-header bg-white border-bottom-0 pt-4 px-4 d-flex justify-content-between align-items-center">
                             <div>
-                                <span class="badge bg-success rounded-pill mb-2">發布模式</span>
-                                <h4 class="mb-0 text-dark fw-bold">發布 {{ currentGrade }} 年級聯絡事項</h4>
+                                <span v-if="editingId" class="badge bg-warning text-dark rounded-pill mb-2"><i
+                                        class="bi bi-pencil-fill me-1"></i> 編輯模式</span>
+                                <span v-else class="badge bg-success rounded-pill mb-2">發布模式</span>
+                                <h4 class="mb-0 text-dark fw-bold">
+                                    {{ editingId ? '修改' : '發布' }} {{ currentGrade }} 年級聯絡事項
+                                </h4>
                             </div>
                             <button class="btn btn-outline-danger btn-sm rounded-pill px-3" @click="handleLogout">
                                 <i class="bi bi-box-arrow-right me-1"></i> 登出
@@ -306,13 +310,22 @@
                                     placeholder="請在此輸入聯絡事項內容..."></textarea>
                             </div>
                             <div class="d-flex justify-content-between align-items-center">
-                                <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 border-2 fw-bold">
-                                    <i class="bi bi-paperclip me-1"></i> 讀取文字檔
-                                    <input type="file" @change="handleFileSelect" hidden>
-                                </label>
+                                <div class="d-flex gap-2">
+                                    <label class="btn btn-outline-secondary btn-sm rounded-pill px-3 border-2 fw-bold">
+                                        <i class="bi bi-paperclip me-1"></i> 讀取文字檔
+                                        <input type="file" @change="handleFileSelect" hidden>
+                                    </label>
+                                    <button v-if="editingId"
+                                        class="btn btn-outline-secondary btn-sm rounded-pill px-3 border-2 fw-bold"
+                                        @click="cancelEditing">
+                                        取消編輯
+                                    </button>
+                                </div>
                                 <button class="btn btn-warm shadow-lg px-5 py-2 fs-5 fw-bold" @click="handleUpload"
                                     :disabled="!inputText.trim()">
-                                    <i class="bi bi-send-fill me-2"></i> 發布事項
+                                    <i :class="editingId ? 'bi bi-check-circle-fill' : 'bi bi-send-fill'"
+                                        class="me-2"></i>
+                                    {{ editingId ? '儲存變更' : '發布事項' }}
                                 </button>
                             </div>
                         </div>
@@ -340,7 +353,11 @@
                                         formatTime(doc.endTime) }}</span>
                                 </div>
                             </div>
-                            <div class="ms-3">
+                            <div class="ms-3 d-flex flex-column gap-2">
+                                <button class="btn btn-light text-primary rounded-circle p-2 shadow-sm hover-shadow"
+                                    @click="startEditing(doc)" title="編輯此事項">
+                                    <i class="bi bi-pencil-square fs-5"></i>
+                                </button>
                                 <button class="btn btn-light text-danger rounded-circle p-2 shadow-sm hover-shadow"
                                     @click="handleDelete(doc.id)" title="刪除此事項">
                                     <i class="bi bi-trash-fill fs-5"></i>
@@ -487,7 +504,7 @@
         import { createApp, ref, onMounted, onUnmounted, computed } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
         // ---------------------------------------------------------
         // Firebase Config
@@ -541,6 +558,7 @@
                 const inputText = ref('');
                 const startTime = ref('');
                 const endTime = ref('');
+                const editingId = ref(null);
 
                 // 顯示設定 (預設 48px)
                 const fontSize = ref(48);
@@ -550,6 +568,25 @@
                     const d = new Date(date);
                     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
                     return d.toISOString().slice(0, 16);
+                };
+
+                const updateInputsFromDoc = (doc) => {
+                    inputText.value = doc.content;
+                    startTime.value = formatDateTimeLocal(doc.startTime);
+                    endTime.value = formatDateTimeLocal(doc.endTime);
+                };
+
+                const startEditing = (doc) => {
+                    editingId.value = doc.id;
+                    updateInputsFromDoc(doc);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                };
+
+                const cancelEditing = () => {
+                    editingId.value = null;
+                    inputText.value = '';
+                    startTime.value = formatDateTimeLocal(new Date());
+                    endTime.value = formatDateTimeLocal(new Date(Date.now() + 3600000));
                 };
 
                 startTime.value = formatDateTimeLocal(new Date());
@@ -613,6 +650,14 @@
                         });
                         docs.sort((a, b) => b.createdAt - a.createdAt);
                         documents.value = docs;
+
+                        // 同步更新編輯中的資料
+                        if (editingId.value) {
+                            const currentDoc = docs.find(d => d.id === editingId.value);
+                            if (!currentDoc) {
+                                cancelEditing();
+                            }
+                        }
                     }, (error) => {
                         console.error("Firestore Listen Error:", error);
                         loading.value = false;
@@ -647,6 +692,7 @@
 
                 const handleLogout = () => {
                     senderStep.value = 'select-grade';
+                    cancelEditing();
                 };
 
                 const handleUpload = async () => {
@@ -662,26 +708,38 @@
                             return;
                         }
 
-                        const fullColRef = collection(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`);
-
-                        await addDoc(fullColRef, {
-                            content: inputText.value,
-                            authorId: user.value.uid,
-                            createdAt: serverTimestamp(),
-                            startTime: Timestamp.fromDate(start),
-                            endTime: Timestamp.fromDate(end),
-                            grade: currentGrade.value,
-                            type: 'text'
-                        });
-
-                        inputText.value = '';
-                        alert('發布成功！');
+                        if (editingId.value) {
+                            // 編輯模式
+                            const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`, editingId.value);
+                            await updateDoc(docRef, {
+                                content: inputText.value,
+                                startTime: Timestamp.fromDate(start),
+                                endTime: Timestamp.fromDate(end),
+                                lastModifiedAt: serverTimestamp()
+                            });
+                            alert('更新成功！');
+                            cancelEditing();
+                        } else {
+                            // 發布模式
+                            const fullColRef = collection(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`);
+                            await addDoc(fullColRef, {
+                                content: inputText.value,
+                                authorId: user.value.uid,
+                                createdAt: serverTimestamp(),
+                                startTime: Timestamp.fromDate(start),
+                                endTime: Timestamp.fromDate(end),
+                                grade: currentGrade.value,
+                                type: 'text'
+                            });
+                            inputText.value = '';
+                            alert('發布成功！');
+                        }
                     } catch (e) {
                         console.error(e);
                         if (e.code === 'permission-denied') {
                             permissionError.value = true;
                         } else {
-                            alert('發布失敗: ' + e.message);
+                            alert('操作失敗: ' + e.message);
                         }
                     } finally {
                         loading.value = false;
@@ -698,7 +756,8 @@
                     if (!confirm('⚠️ 確定要刪除這則聯絡事項嗎？\n\n刪除後無法復原。')) return;
 
                     try {
-                        // 確保路徑與新增時完全一致
+                        if (editingId.value === id) cancelEditing();
+
                         const docRef = doc(db, 'artifacts', APP_ID, 'public', 'data', `timed_documents_grade_${currentGrade.value}`, id);
                         await deleteDoc(docRef);
                         alert('刪除成功！');
@@ -787,9 +846,9 @@
 
                 return {
                     user, documents, loading, permissionError, currentTimeStr, currentDateStr,
-                    appMode, currentGrade, senderStep, passwordInput, inputText, startTime, endTime, fontSize,
+                    appMode, currentGrade, senderStep, passwordInput, inputText, startTime, endTime, fontSize, editingId,
                     changeReceiverGrade, selectGrade, handleLogin, handleLogout, handleUpload, handleDelete, handleFileSelect,
-                    getStatus, getStatusBadge, formatTime, copyUrl, copyText, setMode, adjustFontSize
+                    getStatus, getStatusBadge, formatTime, copyUrl, copyText, setMode, adjustFontSize, startEditing, cancelEditing
                 };
             }
         }).mount('#app');
