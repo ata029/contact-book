@@ -178,26 +178,8 @@
             <h5 class="text-muted fw-bold">資料同步中...</h5>
         </div>
 
-        <!-- 權限錯誤提示 -->
-        <div v-if="permissionError" class="error-overlay">
-            <div class="error-box">
-                <h3 class="text-danger fw-bold mb-3"><i class="bi bi-shield-lock-fill"></i> 資料庫連線被拒絕</h3>
-                <p class="fs-5 text-secondary">請檢查 Firebase 後台設定，確保程式有權限讀寫資料。</p>
-                <div class="alert alert-light border">
-                    <strong>🔧 解決步驟：</strong>
-                    <ol class="mb-0 mt-2 ps-3">
-                        <li class="mb-2">進入 <strong>Firebase Console > Firestore Database > Rules</strong>，將規則改為：<br>
-                            <code class="text-primary">allow read, write: if true;</code>
-                        </li>
-                        <li>進入 <strong>Authentication > Sign-in method</strong>，啟用 <strong>匿名 (Anonymous)</strong> 登入。
-                        </li>
-                    </ol>
-                </div>
-                <button class="btn btn-danger w-100 py-2 rounded-pill fw-bold" @click="location.reload()">
-                    <i class="bi bi-arrow-clockwise me-1"></i> 設定完成，重新載入
-                </button>
-            </div>
-        </div>
+        <!-- 權限錯誤提示 (已依需求移除) -->
+        <!-- <div v-if="permissionError" class="error-overlay"> ... </div> -->
 
         <!-- Header -->
         <header class="header-bar">
@@ -413,9 +395,9 @@
                         </div>
                         <div
                             class="col-md-5 text-md-end text-center bg-light rounded-4 p-3 border border-white shadow-inner">
-                            <small class="text-muted fw-bold ls-2">CURRENT TIME</small>
+                            <small class="text-muted fw-bold ls-2">目前時間</small>
                             <div class="display-3 clock-display my-1">{{ currentTimeStr }}</div>
-                            <div class="text-secondary fw-bold">{{ currentDateStr }}</div>
+                            <div class="text-secondary fw-bold fs-3">{{ currentDateStr }}</div>
                         </div>
                     </div>
                 </div>
@@ -594,7 +576,14 @@
                 endTime.value = formatDateTimeLocal(new Date(Date.now() + 3600000));
 
                 const currentTimeStr = computed(() => currentTime.value.toLocaleTimeString('zh-TW', { hour12: false }));
-                const currentDateStr = computed(() => currentTime.value.toLocaleDateString('zh-TW'));
+                const currentDateStr = computed(() => {
+                    return currentTime.value.toLocaleDateString('zh-TW', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        weekday: 'long'
+                    });
+                });
 
                 // 1. 初始化
                 onMounted(() => {
