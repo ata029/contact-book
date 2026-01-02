@@ -565,15 +565,22 @@
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 };
 
+                // 輔助函式：取得今日指定時間
+                const getTodayAtTime = (hour, minute = 0) => {
+                    const d = new Date();
+                    d.setHours(hour, minute, 0, 0);
+                    return d;
+                };
+
                 const cancelEditing = () => {
                     editingId.value = null;
                     inputText.value = '';
-                    startTime.value = formatDateTimeLocal(new Date());
-                    endTime.value = formatDateTimeLocal(new Date(Date.now() + 3600000));
+                    startTime.value = formatDateTimeLocal(getTodayAtTime(7, 0));  // 預設早上 7 點
+                    endTime.value = formatDateTimeLocal(getTodayAtTime(22, 0));   // 預設晚上 10 點
                 };
 
-                startTime.value = formatDateTimeLocal(new Date());
-                endTime.value = formatDateTimeLocal(new Date(Date.now() + 3600000));
+                startTime.value = formatDateTimeLocal(getTodayAtTime(7, 0));  // 預設早上 7 點
+                endTime.value = formatDateTimeLocal(getTodayAtTime(22, 0));   // 預設晚上 10 點
 
                 const currentTimeStr = computed(() => currentTime.value.toLocaleTimeString('zh-TW', { hour12: false }));
                 const currentDateStr = computed(() => {
@@ -776,10 +783,17 @@
                                 const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
                                 inputText.value = result.value;
                             } catch (err) {
-                                alert('Word 檔案讀取失敗：' + err.message);
+                                alert('Word (.docx) 檔案讀取失敗：' + err.message);
                             }
                         };
                         reader.readAsArrayBuffer(file);
+                        return;
+                    }
+
+                    // --- 處理舊版 Word 檔案 (.doc) ---
+                    if (fileName.endsWith('.doc')) {
+                        alert('不支援舊版 .doc 格式\n\n請用 Word 將檔案另存為 .docx 格式後再上傳。');
+                        e.target.value = ''; // 清空檔案選擇
                         return;
                     }
 
@@ -789,15 +803,61 @@
                         const buffer = ev.target.result;
                         const uint8 = new Uint8Array(buffer);
 
-                        // 嘗試使用 TextDecoder 自動偵測並轉換 (優先嘗試 UTF-8，失敗則嘗試 Big5)
-                        try {
-                            const utf8decoder = new TextDecoder('utf-8', { fatal: true });
-                            inputText.value = utf8decoder.decode(uint8);
-                        } catch (err) {
-                            // 若 UTF-8 解碼失敗，嘗試 Big5 (台灣常見亂碼原因)
-                            const big5decoder = new TextDecoder('big5');
-                            inputText.value = big5decoder.decode(uint8);
+                        // 偵測 BOM (Byte Order Mark) 來判斷編碼
+                        const hasBOM_UTF8 = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
+                        const hasBOM_UTF16LE = uint8[0] === 0xFF && uint8[1] === 0xFE;
+                        const hasBOM_UTF16BE = uint8[0] === 0xFE && uint8[1] === 0xFF;
+
+                        let decodedText = '';
+
+                        // 依 BOM 判斷編碼
+                        if (hasBOM_UTF8) {
+                            decodedText = new TextDecoder('utf-8').decode(uint8);
+                        } else if (hasBOM_UTF16LE) {
+                            decodedText = new TextDecoder('utf-16le').decode(uint8);
+                        } else if (hasBOM_UTF16BE) {
+                            decodedText = new TextDecoder('utf-16be').decode(uint8);
+                        } else {
+                            // 沒有 BOM，嘗試多種編碼
+                            const encodings = ['utf-8', 'big5', 'gbk', 'windows-1252'];
+                            let bestResult = '';
+                            let minGarbled = Infinity;
+
+                            for (const enc of encodings) {
+                                try {
+                                    const decoder = new TextDecoder(enc, { fatal: enc === 'utf-8' });
+                                    const text = decoder.decode(uint8);
+
+                                    // 計算亂碼數量 (替代字元 U+FFFD)
+                                    const garbledCount = (text.match(/\uFFFD/g) || []).length;
+
+                                    // 檢查常見中文字符比例
+                                    const chineseChars = text.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || [];
+                                    const hasReasonableChinese = chineseChars.length > 0;
+
+                                    // 優先選擇有中文且少亂碼的結果
+                                    if (garbledCount < minGarbled || (garbledCount === minGarbled && hasReasonableChinese && bestResult === '')) {
+                                        minGarbled = garbledCount;
+                                        bestResult = text;
+                                    }
+
+                                    // 如果 UTF-8 完美解碼（無錯誤），直接使用
+                                    if (enc === 'utf-8' && garbledCount === 0) {
+                                        decodedText = text;
+                                        break;
+                                    }
+                                } catch (err) {
+                                    // UTF-8 fatal 模式會拋出錯誤，繼續嘗試其他編碼
+                                    continue;
+                                }
+                            }
+
+                            if (!decodedText) {
+                                decodedText = bestResult;
+                            }
                         }
+
+                        inputText.value = decodedText;
                     };
                     reader.readAsArrayBuffer(file);
                 };
