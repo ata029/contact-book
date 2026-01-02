@@ -680,6 +680,10 @@
                     const inputHash = await sha256(passwordInput.value);
                     if (inputHash === PASSWORD_HASH) {
                         senderStep.value = 'verified';
+                        // 登入成功後，重設預設時間為今日 07:00 ~ 22:00
+                        inputText.value = '';
+                        startTime.value = formatDateTimeLocal(getTodayAtTime(7, 0));
+                        endTime.value = formatDateTimeLocal(getTodayAtTime(22, 0));
                         startListening();
                     } else {
                         alert('密碼錯誤');
