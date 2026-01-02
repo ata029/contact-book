@@ -16,6 +16,8 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- Mammoth.js for Word .docx support -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- JSZip for ODT support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         /* --- 溫馨教育風格配色 --- */
@@ -802,6 +804,36 @@
                     if (fileName.endsWith('.doc')) {
                         alert('不支援舊版 .doc 格式\n\n請用 Word 將檔案另存為 .docx 格式後再上傳。');
                         e.target.value = ''; // 清空檔案選擇
+                        return;
+                    }
+
+                    // --- 處理 ODT 檔案 (LibreOffice/OpenOffice) ---
+                    if (fileName.endsWith('.odt')) {
+                        const reader = new FileReader();
+                        reader.onload = async (ev) => {
+                            const arrayBuffer = ev.target.result;
+                            try {
+                                const zip = await JSZip.loadAsync(arrayBuffer);
+                                const contentXml = await zip.file('content.xml').async('string');
+
+                                // 解析 XML 並提取純文字
+                                const parser = new DOMParser();
+                                const xmlDoc = parser.parseFromString(contentXml, 'text/xml');
+
+                                // 提取所有 text:p 元素的文字內容
+                                const textElements = xmlDoc.getElementsByTagNameNS('urn:oasis:names:tc:opendocument:xmlns:text:1.0', 'p');
+                                let extractedText = '';
+                                for (let i = 0; i < textElements.length; i++) {
+                                    extractedText += textElements[i].textContent + '\n';
+                                }
+
+                                inputText.value = extractedText.trim();
+                            } catch (err) {
+                                console.error('ODT Error:', err);
+                                alert('ODT 檔案讀取失敗：' + err.message);
+                            }
+                        };
+                        reader.readAsArrayBuffer(file);
                         return;
                     }
 
