@@ -651,7 +651,23 @@
                                 endTime: data.endTime?.toDate() || new Date(),
                             };
                         });
-                        docs.sort((a, b) => b.createdAt - a.createdAt);
+                        // 取得文件狀態的優先順序：active(0) > upcoming(1) > expired(2)
+                        const getStatusPriority = (doc) => {
+                            const now = new Date().getTime();
+                            const start = doc.startTime.getTime();
+                            const end = doc.endTime.getTime();
+                            if (now >= start && now <= end) return 0; // active (開放中)
+                            if (now < start) return 1; // upcoming (尚未開放)
+                            return 2; // expired (已過期)
+                        };
+
+                        // 先按狀態排序（開放中優先），再按建立時間排序（新的優先）
+                        docs.sort((a, b) => {
+                            const priorityA = getStatusPriority(a);
+                            const priorityB = getStatusPriority(b);
+                            if (priorityA !== priorityB) return priorityA - priorityB;
+                            return b.createdAt - a.createdAt;
+                        });
                         documents.value = docs;
 
                         // 同步更新編輯中的資料
