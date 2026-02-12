@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 
 <head>
@@ -20,7 +20,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
-        /* --- 溫馨教育風格配色 --- */
+        /* --- 載入標楷體注音字型 --- */
+        @font-face {
+            font-family: 'BpmfZihiKai';
+            src: url('fonts/BpmfZihiKaiStd-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+            /* 優化載入效能 */
+        }
+
         :root {
             --primary-color: #557C55;
             /* 墨綠色 (黑板色) */
@@ -428,7 +437,43 @@
                                 </span>
                             </div>
                             <div class="card-body p-5">
-                                <pre class="content-pre" :style="{ fontSize: fontSize + 'px' }">{{ doc.content }}</pre>
+                                <!-- 一、二年級：同時顯示兩個版本 -->
+                                <div v-if="currentGrade <= 2">
+                                    <!-- 標楷體注音版本 -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center mb-3">
+                                            <span class="badge bg-primary rounded-pill px-3 py-2">
+                                                <i class="bi bi-fonts me-1"></i> 標楷體注音版本
+                                            </span>
+                                        </div>
+                                        <div class="p-4 rounded-4 border-start border-4 border-primary"
+                                            style="background-color: #f8f9ff;">
+                                            <pre class="content-pre mb-0"
+                                                :style="{ fontSize: fontSize + 'px', fontFamily: 'BpmfZihiKai, DFKai-SB, 標楷體, KaiTi, serif' }">{{ doc.content }}</pre>
+                                        </div>
+                                    </div>
+
+                                    <!-- 原本字體版本 -->
+                                    <div class="mb-4">
+                                        <div class="d-flex align-items-center mb-3">
+                                            <span class="badge bg-secondary rounded-pill px-3 py-2">
+                                                <i class="bi bi-fonts me-1"></i> 原本字體版本
+                                            </span>
+                                        </div>
+                                        <div class="p-4 rounded-4 border-start border-4 border-secondary"
+                                            style="background-color: #f8f9fa;">
+                                            <pre class="content-pre mb-0"
+                                                :style="{ fontSize: fontSize + 'px', fontFamily: 'Microsoft JhengHei, 微軟正黑體, PingFang TC, Heiti TC, Noto Sans TC, sans-serif' }">{{ doc.content }}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 三到六年級：只顯示原本字體 -->
+                                <div v-else>
+                                    <pre class="content-pre"
+                                        :style="{ fontSize: fontSize + 'px', fontFamily: 'Microsoft JhengHei, 微軟正黑體, PingFang TC, Heiti TC, Noto Sans TC, sans-serif' }">{{ doc.content }}</pre>
+                                </div>
+
                                 <hr class="text-muted opacity-25 my-4">
                                 <div class="text-end">
                                     <button class="btn btn-light text-secondary rounded-pill px-4 fw-bold hover-shadow"
@@ -547,6 +592,7 @@
 
                 // 顯示設定 (預設 48px)
                 const fontSize = ref(48);
+                const fontFamily = ref((currentGrade.value <= 2) ? 'kaiti-phonetic' : 'default'); // 預設字體：一、二年級用標楷體注音
 
                 // 輔助函式: 時間格式化 (修正時區問題)
                 const formatDateTimeLocal = (date) => {
@@ -608,6 +654,8 @@
                             if (g >= 1 && g <= 6) {
                                 currentGrade.value = g;
                                 appMode.value = 'receiver';
+                                // 一、二年級預設使用標楷體注音，三到六年級使用原本字體
+                                fontFamily.value = (g <= 2) ? 'kaiti-phonetic' : 'default';
                             }
                         }
                     };
@@ -689,6 +737,8 @@
                 const changeReceiverGrade = (g) => {
                     currentGrade.value = g;
                     window.location.hash = `grade=${g}`;
+                    // 一、二年級預設使用標楷體注音，三到六年級使用原本字體
+                    fontFamily.value = (g <= 2) ? 'kaiti-phonetic' : 'default';
                     startListening();
                 };
 
@@ -983,11 +1033,24 @@
                     fontSize.value = Math.max(16, Math.min(96, fontSize.value + delta));
                 };
 
+                // 字體切換功能
+                const changeFontFamily = (family) => {
+                    fontFamily.value = family;
+                };
+
+                // 取得字體樣式
+                const getFontFamilyStyle = () => {
+                    if (fontFamily.value === 'kaiti-phonetic') {
+                        return 'BpmfZihiKai, DFKai-SB, "標楷體", KaiTi, serif';
+                    }
+                    return '"Microsoft JhengHei", "微軟正黑體", "PingFang TC", "Heiti TC", "Noto Sans TC", sans-serif';
+                };
+
                 return {
                     user, documents, loading, permissionError, currentTimeStr, currentDateStr,
-                    appMode, currentGrade, senderStep, passwordInput, inputText, startTime, endTime, fontSize, editingId,
+                    appMode, currentGrade, senderStep, passwordInput, inputText, startTime, endTime, fontSize, fontFamily, editingId,
                     changeReceiverGrade, selectGrade, handleLogin, handleLogout, handleUpload, handleDelete, handleFileSelect,
-                    getStatus, getStatusBadge, formatTime, copyUrl, copyText, setMode, adjustFontSize, startEditing, cancelEditing
+                    getStatus, getStatusBadge, formatTime, copyUrl, copyText, setMode, adjustFontSize, changeFontFamily, getFontFamilyStyle, startEditing, cancelEditing
                 };
             }
         }).mount('#app');
